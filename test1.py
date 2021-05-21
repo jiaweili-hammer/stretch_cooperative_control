@@ -2,6 +2,10 @@
 from RobotRaconteur.Client import *     #import RR client library
 import sys, time, traceback
 import numpy as np
+from scipy.signal import filtfilt
+from scipy import stats
+import matplotlib.pyplot as plt
+import scipy
 
 #url of each robot
 url1='rr+tcp://192.168.1.64:23232/?service=stretch'
@@ -27,61 +31,127 @@ end_of_arm2=robot2.get_end_of_arm()
 arm1_status = arm1.status_rr.Connect()
 lift1_status=lift1.status_rr.Connect()
 base1_status=base1.status_rr.Connect()
-end_of_arm1_status=end_of_arm1.status_rr.Connect()
+
 
 # Connect to robot2 status RR wire
 arm2_status = arm2.status_rr.Connect()
 lift2_status=lift2.status_rr.Connect()
 base2_status=base2.status_rr.Connect()
-end_of_arm2_status=end_of_arm2.status_rr.Connect()
 
-
-lift1.move_to(0.03) #Reach all the way out
-arm1.move_to(0.03)
-base1.move_to(0.01)
-lift2.move_to(0.03) #Reach all the way out
-arm2.move_to(0.03)
-base2.move_to(0.01)
+lift1.move_to(0.4) #Reach all the way out
+arm1.move_to(0.02)
+base1.translate_by(0.00001)
+lift2.move_to(0.4) #Reach all the way out
+arm2.move_to(0.02)
+base2.translate_by(0.00001)
 robot1.push_command()
 robot2.push_command()
-time.sleep(3)
+time.sleep(1)
 now=time.time()
 
 mass = 1.2
 weight = mass * 9.8
 
-f1_d = weight / 2
-f2_d = weight / 2
-v_d = 0.1
-K1 = 150 * np.eye(3)
-K2 = 150 * np.eye(3)
-F1 = -K1*( - v_d) + f_d
-F2 = -K2*( - v_d) + f_d
+#f1_d = weight / 2
+#f2_d = weight / 2
+f1_d = 7
+f2_d = 7
+v_d = 0.0
+K1 = 150
+K2 = 150
+#F1 = -K1*( - v_d) + f_d
+#F2 = -K2*( - v_d) + f_d
 
+def bandpassfilter(signal):
+	fs = 25.0
+	lowcut = 2
+	#highcut = 50.0
+
+	nyq = 0.5*fs
+	low = lowcut / nyq
+	#high = highcut / nyq
+
+	order = 6
+	b,a = scipy.signal.butter(order, low, btype='low', analog=False)
+	y = scipy.signal.filtfilt(b,a,signal, axis=0)
+
+	return y
+
+
+time.sleep(2)
+filter_flag = 0
+f1_record = []
+f2_record = []
+
+# drop the first few noisy readings
+for i in range(20):
+	discard1 = lift1_status.InValue['force']
+	discard2 = lift2_status.InValue['force']
 
 while True:
 	try:
-		f1 = round(-1 * lift1_status.InValue['force'],3)
-		x1 = K1 * (f1_d - f1) + v_d
-		f2 = round(-1 * lift2_status.InValue['force'],3)
-		x2 = K2 * (f2_d - f2) + v_d
-		base1.translate_by(x1)
-		base2.translate_by(x2)
+		# collect 25 data points. When the num is reached, remove the oldest point and add the newest point
+		if filter_flag == 0:
+			count = 0
+			lift1_force = []
+			lift2_force = []
+			while count < 25:
+				lift1_force.append(-1*lift1_status.InValue['force'])
+				lift2_force.append(-1*lift2_status.InValue['force'])
+				count += 1
+		else:
+			lift1_force.pop(0)
+			lift2_force.pop(0)
+			lift1_force.append(-1*lift1_status.InValue['force'])
+			lift2_force.append(-1*lift2_status.InValue['force'])
 
+		filter_flag = 1
+		lift1_force_filtered = np.array(bandpassfilter(lift1_force))
+		lift2_force_filtered = np.array(bandpassfilter(lift2_force))
+		lift1_force_mean = np.mean(lift1_force_filtered)
+		lift2_force_mean = np.mean(lift2_force_filtered)
+
+		f1 = round(lift1_force_mean,2)
+		f2 = round(lift2_force_mean,2)
+		diff_f1 = f1_d - f1
+		diff_f2 = f2_d - f2
+
+		if abs(diff_f1) < 2.5:
+			diff_f1 = 0
+
+		if abs(diff_f2) < 2.5:
+			diff_f2 = 0
+
+		f1_record.append(f1)
+		f2_record.append(f2)
+
+		x1_dot = K1 * diff_f1 + v_d
+		x2_dot = K2 * diff_f2 + v_d
+		ts = 0.01
+		lift1.move_by(-x1_dot*ts)
+		lift2.move_by(-x2_dot*ts)
+		robot1.push_command()
+		robot2.push_command()
+		
 	except:
 		traceback.print_exc()
 		break
 
-print ('Retracting...')
-lift1.move_to(0.3)
-arm1.move_to(0.0)
-end_of_arm1.move_to('wrist_yaw',0.)
-end_of_arm1.move_to('stretch_gripper',0.)
-
-lift2.move_to(0.3)
-arm2.move_to(0.0)
-end_of_arm2.move_to('wrist_yaw',0.)
-end_of_arm2.move_to('stretch_gripper',0.)
-
+time.sleep(0.5)
+lift1.move_to(0.4)
+lift2.move_to(0.4)
 robot1.push_command( )
 robot2.push_command( )
+print ('Retracting...')
+
+n = np.linspace(0,len(f1_record),len(f1_record))
+f1_record = np.array(f1_record)
+f2_record = np.array(f2_record)
+fig = plt.figure()
+ax1 = fig.add_subplot(2,1,1)
+ax2 = fig.add_subplot(2,1,2)
+ax1.plot(n, f1_record,label='1027')
+ax2.plot(n, f2_record,label='1028')
+ax1.legend()
+ax2.legend()
+plt.show()
