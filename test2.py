@@ -38,11 +38,11 @@ lift2_status=lift2.status_rr.Connect()
 base2_status=base2.status_rr.Connect()
 
 # start the robots' motors
-lift1.move_to(0.4) #Reach all the way out
-arm1.move_to(0.02)
+lift1.move_to(0.55) #Reach all the way out
+arm1.move_to(0.1)
 base1.translate_by(0.00001)
-lift2.move_to(0.4) #Reach all the way out
-arm2.move_to(0.02)
+lift2.move_to(0.55) #Reach all the way out
+arm2.move_to(0.1)
 base2.translate_by(0.00001)
 robot1.push_command()
 robot2.push_command()
@@ -55,11 +55,11 @@ weight = mass * 9.8
 
 #f1_d = weight / 2
 #f2_d = weight / 2
-f1_d = 7
-f2_d = 7
+f1_d = 20
+f2_d = 20
 v_d = 0.0
-K1 = 150
-K2 = 150
+K1 = 0.01
+K2 = 0.01
 #F1 = -K1*( - v_d) + f_d
 #F2 = -K2*( - v_d) + f_d
 
@@ -96,33 +96,33 @@ while True:
 		# collect 25 data points. When the num is reached, remove the oldest point and add the newest point
 		if filter_flag == 0:
 			count = 0
-			lift1_force = []
-			lift2_force = []
+			arm1_force = []
+			arm2_force = []
 			while count < 25:
-				lift1_force.append(-1*lift1_status.InValue['force'])
-				lift2_force.append(-1*lift2_status.InValue['force'])
+				arm1_force.append(arm1_status.InValue['force'])
+				arm2_force.append(arm2_status.InValue['force'])
 				count += 1
 		else:
-			lift1_force.pop(0)
-			lift2_force.pop(0)
-			lift1_force.append(-1*lift1_status.InValue['force'])
-			lift2_force.append(-1*lift2_status.InValue['force'])
+			arm1_force.pop(0)
+			arm2_force.pop(0)
+			arm1_force.append(arm1_status.InValue['force'])
+			arm2_force.append(arm2_status.InValue['force'])
 
 		filter_flag = 1
-		lift1_force_filtered = np.array(bandpassfilter(lift1_force))
-		lift2_force_filtered = np.array(bandpassfilter(lift2_force))
-		lift1_force_mean = np.mean(lift1_force_filtered)
-		lift2_force_mean = np.mean(lift2_force_filtered)
+		arm1_force_filtered = np.array(bandpassfilter(arm1_force))
+		arm2_force_filtered = np.array(bandpassfilter(arm2_force))
+		arm1_force_mean = np.mean(arm1_force_filtered)
+		arm2_force_mean = np.mean(arm2_force_filtered)
 
-		f1 = round(lift1_force_mean,2)
-		f2 = round(lift2_force_mean,2)
+		f1 = round(arm1_force_mean,2)
+		f2 = round(arm2_force_mean,2)
 		diff_f1 = f1_d - f1
 		diff_f2 = f2_d - f2
 
-		if abs(diff_f1) < 2.5:
+		if abs(diff_f1) < 2:
 			diff_f1 = 0
 
-		if abs(diff_f2) < 2.5:
+		if abs(diff_f2) < 2:
 			diff_f2 = 0
 
 		f1_record.append(f1)
@@ -131,8 +131,10 @@ while True:
 		x1_dot = K1 * diff_f1 + v_d
 		x2_dot = K2 * diff_f2 + v_d
 		ts = 0.01
-		lift1.move_by(-x1_dot*ts)
-		lift2.move_by(-x2_dot*ts)
+		arm1.move_by(x1_dot*ts)
+		arm2.move_by(x2_dot*ts)
+		lift1.move_to(0.55)
+		lift2.move_to(0.55)
 		robot1.push_command()
 		robot2.push_command()
 		
@@ -141,8 +143,10 @@ while True:
 		break
 
 time.sleep(0.5)
-lift1.move_to(0.4)
-lift2.move_to(0.4)
+lift1.move_to(0.5)
+lift2.move_to(0.5)
+arm1.move_to(0.0)
+arm2.move_to(0.0)
 robot1.push_command( )
 robot2.push_command( )
 print ('Retracting...')
