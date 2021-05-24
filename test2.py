@@ -6,6 +6,7 @@ from scipy.signal import filtfilt
 from scipy import stats
 import matplotlib.pyplot as plt
 import scipy
+import PID
 
 #url of each robot
 url1='rr+tcp://192.168.1.64:23232/?service=stretch'
@@ -49,20 +50,6 @@ robot2.push_command()
 time.sleep(1)
 now=time.time()
 
-# some parameters
-mass = 1.2
-weight = mass * 9.8
-
-#f1_d = weight / 2
-#f2_d = weight / 2
-f1_d = 20
-f2_d = 20
-v_d = 0.0
-K1 = 0.01
-K2 = 0.01
-#F1 = -K1*( - v_d) + f_d
-#F2 = -K2*( - v_d) + f_d
-
 def bandpassfilter(signal):
 	fs = 25.0
 	lowcut = 2
@@ -78,11 +65,34 @@ def bandpassfilter(signal):
 
 	return y
 
+# some parameters
+mass = 1.2
+weight = mass * 9.8
 
+#f1_d = weight / 2
+#f2_d = weight / 2
+f1_d = 20
+f2_d = 20
+v_d = 0.0
+K1 = 0.01
+K2 = 0.01
+#F1 = -K1*( - v_d) + f_d
+#F2 = -K2*( - v_d) + f_d
 time.sleep(2)
 filter_flag = 0
 f1_record = []
 f2_record = []
+
+P = 1
+I = 1
+D = 1
+pid1 = PID.PID(P, I, D)
+pid2 = PID.PID(P, I, D)
+pid1.SetPoint = f1_d
+pid2.SetPoint = f2_d
+pid1.setSampleTime(0.05)
+pid2.setSampleTime(0.05)
+
 
 # drop the first few noisy readings
 for i in range(20):
@@ -90,6 +100,7 @@ for i in range(20):
 	discard2 = lift2_status.InValue['force']
 	discard3 = arm1_status.InValue['force']
 	discard4 = arm2_status.InValue['force']
+	time.sleep(0.05) # the motor sampling frequency is 25 Hz
 
 while True:
 	try:
@@ -102,6 +113,7 @@ while True:
 				arm1_force.append(arm1_status.InValue['force'])
 				arm2_force.append(arm2_status.InValue['force'])
 				count += 1
+				time.sleep(0.05) # the motor sampling frequency is 25 Hz
 		else:
 			arm1_force.pop(0)
 			arm2_force.pop(0)
@@ -128,13 +140,18 @@ while True:
 		f1_record.append(f1)
 		f2_record.append(f2)
 
-		x1_dot = K1 * diff_f1 + v_d
-		x2_dot = K2 * diff_f2 + v_d
-		ts = 0.01
+		pid1.update(diff_f1)
+		pid2.update(diff_f2)
+		offset1 = pid1.output
+		offset2 = pid2.output
+
+		x1_dot = K1 * diff_f1 + v_d + offset1
+		x2_dot = K2 * diff_f2 + v_d + offset2
+		ts = 0.05
 		arm1.move_by(x1_dot*ts)
 		arm2.move_by(x2_dot*ts)
-		lift1.move_to(0.55)
-		lift2.move_to(0.55)
+		lift1.move_to(0.55) # maintain the pose of the lift
+		lift2.move_to(0.55) # maintain the pose of the lift
 		robot1.push_command()
 		robot2.push_command()
 		
@@ -143,8 +160,8 @@ while True:
 		break
 
 time.sleep(0.5)
-lift1.move_to(0.5)
-lift2.move_to(0.5)
+lift1.move_to(0.4)
+lift2.move_to(0.4)
 arm1.move_to(0.0)
 arm2.move_to(0.0)
 robot1.push_command( )
