@@ -39,10 +39,10 @@ lift2_status=lift2.status_rr.Connect()
 base2_status=base2.status_rr.Connect()
 
 # start the robots' motors
-lift1.move_to(0.55) #Reach all the way out
+lift1.move_to(0.4) #Reach all the way out
 arm1.move_to(0.1)
 base1.translate_by(0.00001)
-lift2.move_to(0.55) #Reach all the way out
+lift2.move_to(0.4) #Reach all the way out
 arm2.move_to(0.1)
 base2.translate_by(0.00001)
 robot1.push_command()
@@ -71,11 +71,11 @@ weight = mass * 9.8
 
 #f1_d = weight / 2
 #f2_d = weight / 2
-f1_d = 20
-f2_d = 20
+f1_d = 15
+f2_d = 15
 v_d = 0.0
-K1 = 0.01
-K2 = 0.01
+K1 = 0.05
+K2 = 0.05
 #F1 = -K1*( - v_d) + f_d
 #F2 = -K2*( - v_d) + f_d
 time.sleep(2)
@@ -83,9 +83,9 @@ filter_flag = 0
 f1_record = []
 f2_record = []
 
-P = 1
-I = 1
-D = 1
+P = 300
+I = 10
+D = 150
 pid1 = PID.PID(P, I, D)
 pid2 = PID.PID(P, I, D)
 pid1.SetPoint = f1_d
@@ -113,7 +113,7 @@ while True:
 				arm1_force.append(arm1_status.InValue['force'])
 				arm2_force.append(arm2_status.InValue['force'])
 				count += 1
-				time.sleep(0.05) # the motor sampling frequency is 25 Hz
+				time.sleep(0.06) # the motor sampling frequency is 25 Hz
 		else:
 			arm1_force.pop(0)
 			arm2_force.pop(0)
@@ -140,8 +140,8 @@ while True:
 		f1_record.append(f1)
 		f2_record.append(f2)
 
-		pid1.update(diff_f1)
-		pid2.update(diff_f2)
+		pid1.update(f1)
+		pid2.update(f2)
 		offset1 = pid1.output
 		offset2 = pid2.output
 
@@ -150,8 +150,12 @@ while True:
 		ts = 0.05
 		arm1.move_by(x1_dot*ts)
 		arm2.move_by(x2_dot*ts)
-		lift1.move_to(0.55) # maintain the pose of the lift
-		lift2.move_to(0.55) # maintain the pose of the lift
+		lift1.move_to(0.4) # maintain the pose of the lift
+		lift2.move_to(0.4) # maintain the pose of the lift
+		base1.translate_by(0.00001) # maintain the pose of the base
+		base2.translate_by(0.00001) # maintain the pose of the base
+		base1.rotate_by(0.00001)
+		base1.rotate_by(0.00001)
 		robot1.push_command()
 		robot2.push_command()
 		
@@ -160,8 +164,8 @@ while True:
 		break
 
 time.sleep(0.5)
-lift1.move_to(0.4)
-lift2.move_to(0.4)
+lift1.move_to(0.3)
+lift2.move_to(0.3)
 arm1.move_to(0.0)
 arm2.move_to(0.0)
 robot1.push_command( )
