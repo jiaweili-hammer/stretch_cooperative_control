@@ -40,10 +40,10 @@ base2_status=base2.status_rr.Connect()
 
 # start the robots' motors
 lift1.move_to(0.4) #Reach all the way out
-arm1.move_to(0.1)
+arm1.move_to(0.05)
 base1.translate_by(0.00001)
 lift2.move_to(0.4) #Reach all the way out
-arm2.move_to(0.1)
+arm2.move_to(0.05)
 base2.translate_by(0.00001)
 robot1.push_command()
 robot2.push_command()
@@ -71,8 +71,8 @@ weight = mass * 9.8
 
 #f1_d = weight / 2
 #f2_d = weight / 2
-f1_d = 15
-f2_d = 15
+f1_d = 150
+f2_d = 150
 v_d = 0.0
 K1 = 0.05
 K2 = 0.05
@@ -83,9 +83,9 @@ filter_flag = 0
 f1_record = []
 f2_record = []
 
-P = 300
-I = 10
-D = 150
+P = 1
+I = 0.5
+D = 0.1
 pid1 = PID.PID(P, I, D)
 pid2 = PID.PID(P, I, D)
 pid1.SetPoint = f1_d
@@ -131,10 +131,10 @@ while True:
 		diff_f1 = f1_d - f1
 		diff_f2 = f2_d - f2
 
-		if abs(diff_f1) < 2:
+		if abs(diff_f1) < 2.5:
 			diff_f1 = 0
 
-		if abs(diff_f2) < 2:
+		if abs(diff_f2) < 2.5:
 			diff_f2 = 0
 
 		f1_record.append(f1)
