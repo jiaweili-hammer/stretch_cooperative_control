@@ -94,7 +94,7 @@ pid1.setSampleTime(0.05)
 pid2.setSampleTime(0.05)
 
 
-# drop the first few noisy readings
+# discard the first few noisy readings
 for i in range(20):
 	discard1 = lift1_status.InValue['force']
 	discard2 = lift2_status.InValue['force']
@@ -150,8 +150,8 @@ while True:
 		print('this is offes1:', offset1)
 		print('this is offes2:', offset2)
 
-		x1_dot = K1 * diff_f1 + v_d + offset1
-		x2_dot = K2 * diff_f2 + v_d + offset2
+		x1_dot = K1 * diff_f1 + v_d 
+		x2_dot = K2 * diff_f2 + v_d 
 		#ts = 0.05
 		arm1.move_by(x1_dot)
 		arm2.move_by(x2_dot)
