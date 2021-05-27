@@ -39,7 +39,7 @@ lift2_status=lift2.status_rr.Connect()
 base2_status=base2.status_rr.Connect()
 
 # start the robots' motors
-lift1.move_to(0.4) #Reach all the way out
+lift1.move_to(0.375) #Reach all the way out
 arm1.move_to(0.05)
 base1.translate_by(0.00001)
 lift2.move_to(0.4) #Reach all the way out
@@ -74,8 +74,8 @@ weight = mass * 9.8
 f1_d = 20
 f2_d = 20
 v_d = 0.0
-K1 = 0.0005
-K2 = 0.0005
+K1 = 0.0003
+K2 = 0.0003
 #F1 = -K1*( - v_d) + f_d
 #F2 = -K2*( - v_d) + f_d
 time.sleep(2)
@@ -83,13 +83,13 @@ filter_flag = 0
 f1_record = []
 f2_record = []
 
-P = 0.025
-I = 0.005
-D = 0.001
+P = 0.0
+I = 0.0005
+D = 0.0001
 pid1 = PID.PID(P, I, D)
 pid2 = PID.PID(P, I, D)
-pid1.SetPoint = v_d
-pid2.SetPoint = v_d
+pid1.SetPoint = f1_d
+pid2.SetPoint = f2_d
 pid1.setSampleTime(0.05)
 pid2.setSampleTime(0.05)
 
@@ -104,8 +104,11 @@ for i in range(20):
 
 x1_dot = 0.0
 x2_dot = 0.0
+f1_reading = 0
+f2_reading = 0
 while True:
 	try:
+		now=time.time()
 		# collect 25 data points. When the num is reached, remove the oldest point and add the newest point
 		if filter_flag == 0:
 			count = 0
@@ -119,8 +122,20 @@ while True:
 		else:
 			arm1_force.pop(0)
 			arm2_force.pop(0)
-			arm1_force.append(arm1_status.InValue['force'])
-			arm2_force.append(arm2_status.InValue['force'])
+			count_ = 0
+
+			# force reading is very noisy when the arm is moving
+			# this while loop is created to discard the first few readings
+			while count_ < 5:
+				discard1_ = arm1_status.InValue['force']
+				discard2_ = arm2_status.InValue['force']
+				count_ += 1
+				time.sleep(0.02)
+
+			f1_reading = arm1_status.InValue['force']
+			f2_reading = arm2_status.InValue['force']
+			arm1_force.append(f1_reading)
+			arm2_force.append(f2_reading)
 
 		filter_flag = 1
 		arm1_force_filtered = np.array(bandpassfilter(arm1_force))
@@ -131,7 +146,7 @@ while True:
 		f1 = round(arm1_force_mean,5)
 		f2 = round(arm2_force_mean,5)
 		diff_f1 = f1_d - f1
-		diff_f2 = f2_d - f2
+		diff_f2 = f2_d - f2 
 
 		if abs(diff_f1) < 1:
 			diff_f1 = 0
@@ -142,20 +157,20 @@ while True:
 		f1_record.append(f1)
 		f2_record.append(f2)
 
-		pid1.update(x1_dot)
-		pid2.update(x2_dot)
+		pid1.update(f1)
+		pid2.update(f2)
 		offset1 = pid1.output
 		offset2 = pid2.output
 
-		print('this is offes1:', offset1)
-		print('this is offes2:', offset2)
+		#print('this is offes1:', offset1)
+		#print('this is offes2:', offset2)
 
 		x1_dot = K1 * diff_f1 + v_d 
 		x2_dot = K2 * diff_f2 + v_d 
 		#ts = 0.05
 		arm1.move_by(x1_dot)
 		arm2.move_by(x2_dot)
-		lift1.move_to(0.4) # maintain the pose of the lift
+		lift1.move_to(0.375) # maintain the pose of the lift
 		lift2.move_to(0.4) # maintain the pose of the lift
 		base1.translate_by(0.0) # maintain the pose of the base
 		base2.translate_by(0.0) # maintain the pose of the base
@@ -163,8 +178,8 @@ while True:
 		base1.rotate_by(0.0)
 		robot1.push_command()
 		robot2.push_command()
-		time.sleep(0.05)
-		
+		print(time.time()-now)
+
 	except:
 		traceback.print_exc()
 		break
