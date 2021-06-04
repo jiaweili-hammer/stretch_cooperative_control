@@ -188,7 +188,7 @@ while True:
 		base1.translate_by(0.0) # maintain the pose of the base
 		base2.translate_by(0.0) # maintain the pose of the base
 		base1.rotate_by(0.0)
-		base1.rotate_by(0.0)
+		base2.rotate_by(0.0)
 		robot1.push_command()
 		robot2.push_command()
 		print(time.time()-now)

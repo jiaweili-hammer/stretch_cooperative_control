@@ -43,12 +43,12 @@ lift2_status=lift2.status_rr.Connect()
 base2_status=base2.status_rr.Connect()
 
 # start the robots' motors
-lift1.move_to(0.377) #Reach all the way out
+lift1.move_to(0.38) #Reach all the way out
 arm1.move_to(0.05)
-base1.translate_by(0.00001)
+base1.translate_by(0.0)
 lift2.move_to(0.4) #Reach all the way out
 arm2.move_to(0.05)
-base2.translate_by(0.00001)
+base2.translate_by(0.0)
 robot1.push_command()
 robot2.push_command()
 time.sleep(1)
@@ -70,32 +70,25 @@ def bandpassfilter(signal):
 	return y
 
 # some parameters
-mass = 1.2
-weight = mass * 9.8
-
-#f1_d = weight / 2
-#f2_d = weight / 2
 f1_d = 20
 f2_d = 20
 v1_d = 0
 v2_d = 0
 K1_fwd = 0.000365
 K2_fwd = 0.00035
-K1_bwd = 0.0001
-K2_bwd = 0.0001
+K1_bwd = 0.00008
+K2_bwd = 0.00008
 #F1 = -K1*( - v_d) + f_d
 #F2 = -K2*( - v_d) + f_d
 time.sleep(2)
 filter_flag = 0
 f1_record = []
 f2_record = []
-z1 = 0.377
-z2 = 0.4
-z_vel = 0.01
 
+# parameters for PID controller
 P = 0.0
-I = 0.0005
-D = 0.0001
+I = 0.00001
+D = 0.000005
 pid1 = PID.PID(P, I, D)
 pid2 = PID.PID(P, I, D)
 pid1.SetPoint = f1_d
@@ -142,7 +135,7 @@ while True:
 			prev_value=arm1_status.InValue['force']
 			count_=0
 			while True:
-				if count_==1:
+				if count_==2:
 					break
 				if prev_value == arm1_status.InValue['force']:
 					continue
@@ -183,28 +176,28 @@ while True:
 
 		# various gains for forward and backward motion
 		if diff_f1 > 0:
-			x1_dot = K1_fwd * diff_f1 + v1_d
-		else:
-			x1_dot = K1_bwd * diff_f1 + v1_d
+			x1_dot = K1_fwd * diff_f1 + v1_d 
 
+		else:	
+			x1_dot = K1_bwd * diff_f1 + v1_d
+		
 		if diff_f2 > 0:
-			x2_dot = K2_fwd * diff_f2 + v2_d
+			x2_dot = K2_fwd * diff_f2 + v2_d 
 		else:
-			x2_dot = K2_bwd * diff_f2 + v2_d
+			x2_dot = K2_bwd * diff_f2 + v2_d 
 
 		
 		#x1_dot = K1 * diff_f1 + v_d 
 		#x2_dot = K2 * diff_f2 + v_d 
 		
-		#ts = 0.05
 		arm1.move_by(x1_dot)
 		arm2.move_by(x2_dot)
-		lift1.move_to(0.377) # maintain the pose of the lift
+		lift1.move_to(0.38) # maintain the pose of the lift
 		lift2.move_to(0.4) # maintain the pose of the lift
 		base1.translate_by(0.0) # maintain the pose of the base
 		base2.translate_by(0.0) # maintain the pose of the base
 		base1.rotate_by(0.0)
-		base1.rotate_by(0.0)
+		base2.rotate_by(0.0)
 		robot1.push_command()
 		robot2.push_command()
 		print(time.time()-now)
@@ -229,10 +222,10 @@ fig = plt.figure()
 ax1 = fig.add_subplot(2,1,1)
 ax2 = fig.add_subplot(2,1,2)
 ax1.plot(n, f1_record,label='1027')
-ax1.set_xlabel('number of samples')
+ax1.set_xlabel('frame')
 ax1.set_ylabel('force (N)')
 ax2.plot(n, f2_record,label='1028')
-ax2.set_xlabel('number of samples')
+ax2.set_xlabel('frame')
 ax2.set_ylabel('force (N)')
 ax1.legend()
 ax2.legend()
