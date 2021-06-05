@@ -89,13 +89,13 @@ time.sleep(2)
 filter_flag = 0
 f1_record = []
 f2_record = []
-y1_0 = 0.377
+y1_0 = 0.38
 y2_0 = 0.4
-y_vel = 0.01
+y_vel = 0.005
 
 P = 0.0
-I = 0.0005
-D = 0.0001
+I = 0.0003
+D = 0.00003
 pid1 = PID.PID(P, I, D)
 pid2 = PID.PID(P, I, D)
 pid1.SetPoint = f1_d
@@ -120,7 +120,7 @@ global_count = 0
 y_vel_count = 0
 while True:
 	try:
-		if global_count > 90:
+		if global_count > 50:
 			y_vel = 0.01
 			y_vel_count += 1
 
@@ -146,7 +146,7 @@ while True:
 			prev_value=arm1_status.InValue['force']
 			count_=0
 			while True:
-				if count_==3:
+				if count_==2:
 					break
 				if prev_value == arm1_status.InValue['force']:
 					continue
@@ -227,9 +227,9 @@ print ('Retracting...')
 n = np.linspace(0,len(f1_record),len(f1_record))
 f1_record = np.array(f1_record)
 f2_record = np.array(f2_record)
-fig = plt.figure()
-ax1 = fig.add_subplot(2,1,1)
-ax2 = fig.add_subplot(2,1,2)
+fig1 = plt.figure()
+ax1 = fig1.add_subplot(2,1,1)
+ax2 = fig1.add_subplot(2,1,2)
 ax1.plot(n, f1_record,label='1027')
 ax1.set_xlabel('number of samples')
 ax1.set_ylabel('force (N)')

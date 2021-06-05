@@ -43,7 +43,7 @@ lift2_status=lift2.status_rr.Connect()
 base2_status=base2.status_rr.Connect()
 
 # start the robots' motors
-lift1.move_to(0.38) #Reach all the way out
+lift1.move_to(0.385) #Reach all the way out
 arm1.move_to(0.05)
 base1.translate_by(0.0)
 lift2.move_to(0.4) #Reach all the way out
@@ -74,12 +74,12 @@ f1_d = 20
 f2_d = 20
 v1_d = 0
 v2_d = 0
-K1_fwd = 0.000365
+K1_fwd = 0.00037
 K2_fwd = 0.00035
 K1_bwd = 0.00008
-K2_bwd = 0.00008
-#F1 = -K1*( - v_d) + f_d
-#F2 = -K2*( - v_d) + f_d
+K2_bwd = 0.00021
+
+
 time.sleep(2)
 filter_flag = 0
 f1_record = []
@@ -87,18 +87,23 @@ f2_record = []
 
 # parameters for PID controller
 P = 0.0
-I = 0.00001
-D = 0.000005
-pid1 = PID.PID(P, I, D)
-pid2 = PID.PID(P, I, D)
+
+I_1 = 0.000081
+D_1 = 0.00001
+
+I_2 = 0.00005
+D_2 = 0.00001
+
+pid1 = PID.PID(P, I_1, D_1)
+pid2 = PID.PID(P, I_2, D_2)
 pid1.SetPoint = f1_d
 pid2.SetPoint = f2_d
-pid1.setSampleTime(0.05)
-pid2.setSampleTime(0.05)
+pid1.setSampleTime(0.1)
+pid2.setSampleTime(0.1)
 
 
 # discard the first few noisy readings
-for i in range(20):
+for i in range(30):
 	discard1 = lift1_status.InValue['force']
 	discard2 = lift2_status.InValue['force']
 	discard3 = arm1_status.InValue['force']
@@ -107,9 +112,9 @@ for i in range(20):
 
 x1_dot = 0.0
 x2_dot = 0.0
-f1_reading = 0
-f2_reading = 0
-global_count = 0
+f1_reading = 0.0
+f2_reading = 0.0
+
 while True:
 	try:
 
@@ -121,7 +126,7 @@ while True:
 			arm1_force = []
 			arm2_force = []
 			while count < 25:
-				arm1_force.append(arm1_status.InValue['force'])
+				arm1_force.append(arm1_status.InValue['force'] + 1.55)  # don't know why, but it seems add extra 1.55 to 1027 and let it have better performance
 				arm2_force.append(arm2_status.InValue['force'])
 				count += 1
 				time.sleep(0.06) # the motor sampling frequency is 25 Hz
@@ -144,8 +149,8 @@ while True:
 					prev_value=arm1_status.InValue['force']
 
 
-			f1_reading = arm1_status.InValue['force']
-			f2_reading = arm2_status.InValue['force']
+			f1_reading = arm1_status.InValue['force'] + 1.55 
+			f2_reading = arm2_status.InValue['force'] 
 			arm1_force.append(f1_reading)
 			arm2_force.append(f2_reading)
 
@@ -155,15 +160,15 @@ while True:
 		arm1_force_mean = np.mean(arm1_force_filtered)
 		arm2_force_mean = np.mean(arm2_force_filtered)
 
-		f1 = round(arm1_force_mean,5)
-		f2 = round(arm2_force_mean,5)
+		f1 = round(arm1_force_mean,8)
+		f2 = round(arm2_force_mean,8)
 		diff_f1 = f1_d - f1
 		diff_f2 = f2_d - f2 
 
-		if abs(diff_f1) < 1:
+		if abs(diff_f1) < 0.8:
 			diff_f1 = 0
 
-		if abs(diff_f2) < 1:
+		if abs(diff_f2) < 0.8:
 			diff_f2 = 0
 
 		f1_record.append(f1)
@@ -176,23 +181,22 @@ while True:
 
 		# various gains for forward and backward motion
 		if diff_f1 > 0:
-			x1_dot = K1_fwd * diff_f1 + v1_d 
-
-		else:	
+			x1_dot = K1_fwd * diff_f1 + v1_d
+		else:		
 			x1_dot = K1_bwd * diff_f1 + v1_d
 		
 		if diff_f2 > 0:
-			x2_dot = K2_fwd * diff_f2 + v2_d 
+			x2_dot = K2_fwd * diff_f2 + v2_d
 		else:
-			x2_dot = K2_bwd * diff_f2 + v2_d 
+			x2_dot = K2_bwd * diff_f2 + v2_d
 
 		
-		#x1_dot = K1 * diff_f1 + v_d 
-		#x2_dot = K2 * diff_f2 + v_d 
+		#x1_dot = x1_dot + offset1
+		#x2_dot = x2_dot + offset2
 		
 		arm1.move_by(x1_dot)
 		arm2.move_by(x2_dot)
-		lift1.move_to(0.38) # maintain the pose of the lift
+		lift1.move_to(0.385) # maintain the pose of the lift
 		lift2.move_to(0.4) # maintain the pose of the lift
 		base1.translate_by(0.0) # maintain the pose of the base
 		base2.translate_by(0.0) # maintain the pose of the base
@@ -201,7 +205,7 @@ while True:
 		robot1.push_command()
 		robot2.push_command()
 		print(time.time()-now)
-		global_count += 1
+
 	except:
 		traceback.print_exc()
 		break
@@ -229,4 +233,6 @@ ax2.set_xlabel('frame')
 ax2.set_ylabel('force (N)')
 ax1.legend()
 ax2.legend()
+ax1.set_ylim([0,40])
+ax2.set_ylim([0,40])
 plt.show()
