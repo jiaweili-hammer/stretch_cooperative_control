@@ -43,7 +43,7 @@ lift2_status=lift2.status_rr.Connect()
 base2_status=base2.status_rr.Connect()
 
 # start the robots' motors
-lift1.move_to(0.385) #Reach all the way out
+lift1.move_to(0.38) #Reach all the way out
 arm1.move_to(0.05)
 base1.translate_by(0.0)
 lift2.move_to(0.4) #Reach all the way out
@@ -74,16 +74,24 @@ f1_d = 20
 f2_d = 20
 v1_d = 0
 v2_d = 0
-K1_fwd = 0.00037
-K2_fwd = 0.00035
-K1_bwd = 0.00008
-K2_bwd = 0.00021
+#K1_fwd = 0.00037
+#K2_fwd = 0.00035
 
+K1_fwd = 0.00028
+K2_fwd = 0.00023
+
+K1_bwd = 0.00005
+K2_bwd = 0.00018
+
+feed_forward_1 = 1.55
+feed_forward_2 = -0.5
 
 time.sleep(2)
 filter_flag = 0
 f1_record = []
 f2_record = []
+x1_dot_record = []
+x2_dot_record = []
 
 # parameters for PID controller
 P = 0.0
@@ -126,8 +134,9 @@ while True:
 			arm1_force = []
 			arm2_force = []
 			while count < 25:
-				arm1_force.append(arm1_status.InValue['force'] + 1.55)  # don't know why, but it seems add extra 1.55 to 1027 and let it have better performance
-				arm2_force.append(arm2_status.InValue['force'])
+				arm1_force.append(arm1_status.InValue['force'] + feed_forward_1)  # don't know why, but it seems add extra 1.55 to 1027 and let it have better performance
+																		# feedforward			
+				arm2_force.append(arm2_status.InValue['force'] + feed_forward_2) 
 				count += 1
 				time.sleep(0.06) # the motor sampling frequency is 25 Hz
 		else:
@@ -149,8 +158,8 @@ while True:
 					prev_value=arm1_status.InValue['force']
 
 
-			f1_reading = arm1_status.InValue['force'] + 1.55 
-			f2_reading = arm2_status.InValue['force'] 
+			f1_reading = arm1_status.InValue['force'] + feed_forward_1
+			f2_reading = arm2_status.InValue['force'] + feed_forward_2
 			arm1_force.append(f1_reading)
 			arm2_force.append(f2_reading)
 
@@ -165,10 +174,10 @@ while True:
 		diff_f1 = f1_d - f1
 		diff_f2 = f2_d - f2 
 
-		if abs(diff_f1) < 0.8:
+		if abs(diff_f1) < 1:
 			diff_f1 = 0
 
-		if abs(diff_f2) < 0.8:
+		if abs(diff_f2) < 1:
 			diff_f2 = 0
 
 		f1_record.append(f1)
@@ -191,12 +200,12 @@ while True:
 			x2_dot = K2_bwd * diff_f2 + v2_d
 
 		
-		#x1_dot = x1_dot + offset1
-		#x2_dot = x2_dot + offset2
-		
+		x1_dot_record.append(x1_dot)
+		x2_dot_record.append(x2_dot)
+
 		arm1.move_by(x1_dot)
 		arm2.move_by(x2_dot)
-		lift1.move_to(0.385) # maintain the pose of the lift
+		lift1.move_to(0.38) # maintain the pose of the lift
 		lift2.move_to(0.4) # maintain the pose of the lift
 		base1.translate_by(0.0) # maintain the pose of the base
 		base2.translate_by(0.0) # maintain the pose of the base
@@ -219,20 +228,40 @@ robot1.push_command( )
 robot2.push_command( )
 print ('Retracting...')
 
-n = np.linspace(0,len(f1_record),len(f1_record))
+n_f = np.linspace(0,len(f1_record),len(f1_record))
 f1_record = np.array(f1_record)
 f2_record = np.array(f2_record)
-fig = plt.figure()
-ax1 = fig.add_subplot(2,1,1)
-ax2 = fig.add_subplot(2,1,2)
-ax1.plot(n, f1_record,label='1027')
+fig1 = plt.figure()
+ax1 = fig1.add_subplot(2,1,1)
+ax2 = fig1.add_subplot(2,1,2)
+ax1.plot(n_f, f1_record,label='1027')
 ax1.set_xlabel('frame')
 ax1.set_ylabel('force (N)')
-ax2.plot(n, f2_record,label='1028')
+ax2.plot(n_f, f2_record,label='1028')
 ax2.set_xlabel('frame')
 ax2.set_ylabel('force (N)')
 ax1.legend()
 ax2.legend()
 ax1.set_ylim([0,40])
 ax2.set_ylim([0,40])
+
+n_x = np.linspace(0,len(x1_dot_record),len(x1_dot_record))
+x1_dot_record = np.array(x1_dot_record)
+x2_dot_record = np.array(x2_dot_record)
+fig2 = plt.figure()
+ax3 = fig2.add_subplot(2,1,1)
+ax4 = fig2.add_subplot(2,1,2)
+ax3.plot(n_x, x1_dot_record,label='1027')
+ax3.set_xlabel('frame')
+ax3.set_ylabel('velocity (m/s)')
+ax4.plot(n_x, x2_dot_record,label='1028')
+ax4.set_xlabel('frame')
+ax4.set_ylabel('velocity (m/s)')
+ax3.legend()
+ax4.legend()
+ax3.set_ylim([0,0.005])
+ax4.set_ylim([0,0.005])
+
 plt.show()
+
+np.savez('thesis_data_1.npy',f1_record, f2_record, x1_dot_record, x2_dot_record)
