@@ -43,7 +43,7 @@ lift2_status=lift2.status_rr.Connect()
 base2_status=base2.status_rr.Connect()
 
 # start the robots' motors
-lift1.move_to(0.38) #Reach all the way out
+lift1.move_to(0.383) #Reach all the way out
 arm1.move_to(0.05)
 base1.translate_by(0.0)
 lift2.move_to(0.4) #Reach all the way out
@@ -77,13 +77,13 @@ v2_d = 0
 #K1_fwd = 0.00037
 #K2_fwd = 0.00035
 
-K1_fwd = 0.00028
-K2_fwd = 0.00023
+K1_fwd = 0.00023
+K2_fwd = 0.0002
 
 K1_bwd = 0.00005
-K2_bwd = 0.00018
+K2_bwd = 0.0002
 
-feed_forward_1 = 1.55
+feed_forward_1 = 1.05
 feed_forward_2 = -0.5
 
 time.sleep(2)
@@ -96,10 +96,10 @@ x2_dot_record = []
 # parameters for PID controller
 P = 0.0
 
-I_1 = 0.000081
+I_1 = 0.000021
 D_1 = 0.00001
 
-I_2 = 0.00005
+I_2 = 0.00001
 D_2 = 0.00001
 
 pid1 = PID.PID(P, I_1, D_1)
@@ -122,11 +122,15 @@ x1_dot = 0.0
 x2_dot = 0.0
 f1_reading = 0.0
 f2_reading = 0.0
-
+global_count = 0
 while True:
 	try:
-
+		global_count += 1
 		now=time.time()
+
+		if global_count > 20:
+			K2_fwd = 0.00018
+			feed_forward_2 = -1
 
 		# collect 25 data points. When the num is reached, remove the oldest point and add the newest point
 		if filter_flag == 0:
@@ -170,14 +174,14 @@ while True:
 		arm2_force_mean = np.mean(arm2_force_filtered)
 
 		f1 = round(arm1_force_mean,8)
-		f2 = round(arm2_force_mean,8)
+		f2 = round(arm2_force_mean,5)
 		diff_f1 = f1_d - f1
 		diff_f2 = f2_d - f2 
 
-		if abs(diff_f1) < 1:
+		if abs(diff_f1) < 1.0:
 			diff_f1 = 0
 
-		if abs(diff_f2) < 1:
+		if abs(diff_f2) < 1.0:
 			diff_f2 = 0
 
 		f1_record.append(f1)
@@ -190,14 +194,18 @@ while True:
 
 		# various gains for forward and backward motion
 		if diff_f1 > 0:
-			x1_dot = K1_fwd * diff_f1 + v1_d
+			x1_dot = K1_fwd * diff_f1 + v1_d 
+		elif diff_f1 == 0:
+			x1_dot = 0
 		else:		
-			x1_dot = K1_bwd * diff_f1 + v1_d
+			x1_dot = K1_bwd * diff_f1 + v1_d 
 		
 		if diff_f2 > 0:
-			x2_dot = K2_fwd * diff_f2 + v2_d
+			x2_dot = K2_fwd * diff_f2 + v2_d + offset2
+		elif diff_f2 == 0:
+			x2_dot = 0
 		else:
-			x2_dot = K2_bwd * diff_f2 + v2_d
+			x2_dot = K2_bwd * diff_f2 + v2_d + offset2
 
 		
 		x1_dot_record.append(x1_dot)
@@ -205,7 +213,7 @@ while True:
 
 		arm1.move_by(x1_dot)
 		arm2.move_by(x2_dot)
-		lift1.move_to(0.38) # maintain the pose of the lift
+		lift1.move_to(0.383) # maintain the pose of the lift
 		lift2.move_to(0.4) # maintain the pose of the lift
 		base1.translate_by(0.0) # maintain the pose of the base
 		base2.translate_by(0.0) # maintain the pose of the base
@@ -228,6 +236,8 @@ robot1.push_command( )
 robot2.push_command( )
 print ('Retracting...')
 
+
+# data processing
 n_f = np.linspace(0,len(f1_record),len(f1_record))
 f1_record = np.array(f1_record)
 f2_record = np.array(f2_record)
@@ -259,8 +269,8 @@ ax4.set_xlabel('frame')
 ax4.set_ylabel('velocity (m/s)')
 ax3.legend()
 ax4.legend()
-ax3.set_ylim([0,0.005])
-ax4.set_ylim([0,0.005])
+ax3.set_ylim([-0.005,0.005])
+ax4.set_ylim([-0.005,0.005])
 
 plt.show()
 
