@@ -1,6 +1,7 @@
 '''
+arm only
 desired force = 20N along arm direction
-desired velocity = 0m/s along lift direction
+desired velocity = 0m/s
 '''
 
 from RobotRaconteur.Client import *     #import RR client library
@@ -79,7 +80,6 @@ v2_d = 0
 
 K1_fwd = 0.00023
 K2_fwd = 0.0002
-
 K1_bwd = 0.00005
 K2_bwd = 0.0002
 

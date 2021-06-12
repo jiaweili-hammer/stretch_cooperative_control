@@ -1,4 +1,5 @@
 '''
+arm + lift
 desired force = 20N along arm direction
 desired velocity = 0.01m/s along lift direction
 '''
@@ -43,12 +44,12 @@ lift2_status=lift2.status_rr.Connect()
 base2_status=base2.status_rr.Connect()
 
 # start the robots' motors
-lift1.move_to(0.377) #Reach all the way out
+lift1.move_to(0.383) #Reach all the way out
 arm1.move_to(0.05)
-base1.translate_by(0.00001)
+base1.translate_by(0.0)
 lift2.move_to(0.4) #Reach all the way out
 arm2.move_to(0.05)
-base2.translate_by(0.00001)
+base2.translate_by(0.0)
 robot1.push_command()
 robot2.push_command()
 time.sleep(1)
@@ -70,38 +71,46 @@ def bandpassfilter(signal):
 	return y
 
 # some parameters
-mass = 1.2
-weight = mass * 9.8
-
-#f1_d = weight / 2
-#f2_d = weight / 2
 f1_d = 20
 f2_d = 20
 v1_d = 0
 v2_d = 0
-K1_fwd = 0.000368
-K2_fwd = 0.00035
-K1_bwd = 0.0001
-K2_bwd = 0.0001
-#F1 = -K1*( - v_d) + f_d
-#F2 = -K2*( - v_d) + f_d
+
+K1_fwd = 0.00027
+K2_fwd = 0.00023
+K1_bwd = 0.00005
+K2_bwd = 0.0002
+
+feed_forward_1 = 1.0
+feed_forward_2 = 0.0
+
 time.sleep(2)
 filter_flag = 0
 f1_record = []
 f2_record = []
-y1_0 = 0.38
-y2_0 = 0.4
-y_vel = 0.005
+x1_dot_record = []
+x2_dot_record = []
+y1_record = []
+y2_record = []
 
+y1_0 = 0.383
+y2_0 = 0.4
+
+# parameters for PID controller
 P = 0.0
-I = 0.0003
-D = 0.00003
-pid1 = PID.PID(P, I, D)
-pid2 = PID.PID(P, I, D)
+
+I_1 = 0.000011
+D_1 = 0.00001
+
+I_2 = 0.000038
+D_2 = 0.000038
+
+pid1 = PID.PID(P, I_1, D_1)
+pid2 = PID.PID(P, I_2, D_2)
 pid1.SetPoint = f1_d
 pid2.SetPoint = f2_d
-pid1.setSampleTime(0.05)
-pid2.setSampleTime(0.05)
+pid1.setSampleTime(0.1)
+pid2.setSampleTime(0.1)
 
 
 # discard the first few noisy readings
@@ -117,14 +126,16 @@ x2_dot = 0.0
 f1_reading = 0
 f2_reading = 0
 global_count = 0
-y_vel_count = 0
+y_vel = 0.0
 while True:
 	try:
-		if global_count > 50:
-			y_vel = 0.01
-			y_vel_count += 1
+		global_count += 1
+		now = time.time()
 
-		now=time.time()
+		if global_count > 50:
+			K2_fwd = 0.00018
+			feed_forward_2 = -0.35
+			y_vel = 0.005
 
 		# collect 25 data points. When the num is reached, remove the oldest point and add the newest point
 		if filter_flag == 0:
@@ -132,8 +143,8 @@ while True:
 			arm1_force = []
 			arm2_force = []
 			while count < 25:
-				arm1_force.append(arm1_status.InValue['force'])
-				arm2_force.append(arm2_status.InValue['force'])
+				arm1_force.append(arm1_status.InValue['force'] + feed_forward_1)
+				arm2_force.append(arm2_status.InValue['force'] + feed_forward_2)
 				count += 1
 				time.sleep(0.06) # the motor sampling frequency is 25 Hz
 		else:
@@ -155,8 +166,8 @@ while True:
 					prev_value=arm1_status.InValue['force']
 
 
-			f1_reading = arm1_status.InValue['force']
-			f2_reading = arm2_status.InValue['force']
+			f1_reading = arm1_status.InValue['force'] + feed_forward_1
+			f2_reading = arm2_status.InValue['force'] + feed_forward_2
 			arm1_force.append(f1_reading)
 			arm2_force.append(f2_reading)
 
@@ -166,15 +177,15 @@ while True:
 		arm1_force_mean = np.mean(arm1_force_filtered)
 		arm2_force_mean = np.mean(arm2_force_filtered)
 
-		f1 = round(arm1_force_mean,5)
+		f1 = round(arm1_force_mean,8)
 		f2 = round(arm2_force_mean,5)
 		diff_f1 = f1_d - f1
 		diff_f2 = f2_d - f2 
 
-		if abs(diff_f1) < 1:
+		if abs(diff_f1) < 1.0:
 			diff_f1 = 0
 
-		if abs(diff_f2) < 1:
+		if abs(diff_f2) < 1.0:
 			diff_f2 = 0
 
 		f1_record.append(f1)
@@ -188,21 +199,30 @@ while True:
 		# various gains for forward and backward motion
 		if diff_f1 > 0:
 			x1_dot = K1_fwd * diff_f1 + v1_d
+		elif diff_f1 == 0:
+			x1_dot = 0
 		else:
 			x1_dot = K1_bwd * diff_f1 + v1_d
 
 		if diff_f2 > 0:
-			x2_dot = K2_fwd * diff_f2 + v2_d
+			x2_dot = K2_fwd * diff_f2 + v2_d + offset2
+		elif diff_f2 == 0:
+			x2_dot = 0
 		else:
-			x2_dot = K2_bwd * diff_f2 + v2_d
+			x2_dot = K2_bwd * diff_f2 + v2_d + offset2
  
-		y1 = y1_0 + y_vel * y_vel_count
-		y2 = y2_0 + y_vel * y_vel_count
-	
+		x1_dot_record.append(x1_dot)
+		x2_dot_record.append(x2_dot)
+
+		#y1 = y1_0 + y_vel * y_vel_count
+		#y2 = y2_0 + y_vel * y_vel_count
+
 		arm1.move_by(x1_dot)
 		arm2.move_by(x2_dot)
-		lift1.move_to(y1) # maintain the pose of the lift
-		lift2.move_to(y2) # maintain the pose of the lift
+		#lift1.move_to(y1) # maintain the pose of the lift
+		#lift2.move_to(y2) # maintain the pose of the lift
+		lift1.move_by(y_vel)
+		lift2.move_by(y_vel)
 		base1.translate_by(0.0) # maintain the pose of the base
 		base2.translate_by(0.0) # maintain the pose of the base
 		base1.rotate_by(0.0)
@@ -210,7 +230,9 @@ while True:
 		robot1.push_command()
 		robot2.push_command()
 		print(time.time()-now)
-		global_count += 1
+		y1_record.append(lift1_status.InValue['pos'])
+		y2_record.append(lift2_status.InValue['pos'])
+	
 	except:
 		traceback.print_exc()
 		break
@@ -224,18 +246,44 @@ robot1.push_command( )
 robot2.push_command( )
 print ('Retracting...')
 
-n = np.linspace(0,len(f1_record),len(f1_record))
+# data processing
+n_f = np.linspace(0,len(f1_record),len(f1_record))
 f1_record = np.array(f1_record)
 f2_record = np.array(f2_record)
 fig1 = plt.figure()
 ax1 = fig1.add_subplot(2,1,1)
 ax2 = fig1.add_subplot(2,1,2)
-ax1.plot(n, f1_record,label='1027')
-ax1.set_xlabel('number of samples')
+ax1.plot(n_f, f1_record,label='1027')
+ax1.set_xlabel('frame')
 ax1.set_ylabel('force (N)')
-ax2.plot(n, f2_record,label='1028')
-ax2.set_xlabel('number of samples')
+ax2.plot(n_f, f2_record,label='1028')
+ax2.set_xlabel('frame')
 ax2.set_ylabel('force (N)')
 ax1.legend()
 ax2.legend()
+ax1.set_ylim([0,40])
+ax2.set_ylim([0,40])
+
+n_x = np.linspace(0,len(x1_dot_record),len(x1_dot_record))
+x1_dot_record = np.array(x1_dot_record)
+x2_dot_record = np.array(x2_dot_record)
+fig2 = plt.figure()
+ax3 = fig2.add_subplot(2,1,1)
+ax4 = fig2.add_subplot(2,1,2)
+ax3.plot(n_x, x1_dot_record,label='1027')
+ax3.set_xlabel('frame')
+ax3.set_ylabel('velocity (m/s)')
+ax4.plot(n_x, x2_dot_record,label='1028')
+ax4.set_xlabel('frame')
+ax4.set_ylabel('velocity (m/s)')
+ax3.legend()
+ax4.legend()
+ax3.set_ylim([-0.005,0.005])
+ax4.set_ylim([-0.005,0.005])
+
+n_y = np.linspace(0,len(y1_record),len(y1_record))
+y1_record = np.array(y1_record)
+y2_record = np.array(y2_record)
 plt.show()
+
+np.savez('thesis_data_2.npy',f1=f1_record, f2=f2_record, x1_dot=x1_dot_record, x2_dot=x2_dot_record,y1=y1_record,y2=y2_record)
