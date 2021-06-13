@@ -1,8 +1,8 @@
 '''
 force compliance: arm
-motion compliance: lift
+motion compliance: base + lift
 desired force = 20N along arm direction
-desired velocity = 0.005m/s along lift direction
+desired velocity = 0.01m/s along base direction, 0.005m/s along lift direction
 '''
 
 from RobotRaconteur.Client import *     #import RR client library
@@ -77,8 +77,8 @@ f2_d = 20
 v1_d = 0
 v2_d = 0
 
-K1_fwd = 0.00027
-K2_fwd = 0.00023
+K1_fwd = 0.00023
+K2_fwd = 0.00021
 K1_bwd = 0.00005
 K2_bwd = 0.0002
 
@@ -91,8 +91,10 @@ f1_record = []
 f2_record = []
 x1_dot_record = []
 x2_dot_record = []
-y1_record = []
-y2_record = []
+z1x_record = []
+z2x_record = []
+z1y_record = []
+z2y_record = []
 
 y1_0 = 0.383
 y2_0 = 0.4
@@ -122,21 +124,42 @@ for i in range(20):
 	discard4 = arm2_status.InValue['force']
 	time.sleep(0.05) # the motor sampling frequency is 25 Hz
 
+# more parameters
 x1_dot = 0.0
 x2_dot = 0.0
 f1_reading = 0
 f2_reading = 0
 global_count = 0
+z_vel = 0.0
+z_vel_offset = 0.0
 y_vel = 0.0
+y_flag = 0
+y_desired_height = 0.6
+z_desired_pose = 0.7
 while True:
 	try:
 		global_count += 1
 		now = time.time()
 
+		# check if lift has reached desired height
+		y1 = lift1_status.InValue['pos']
+		if abs(y_desired_height - y1) < 0.005:
+			y_flag = 1	
+
+		# check if base has reached desired pose
+		x1 = base1_status.InValue['x']
+		if abs(x1 - z_desired_pose) < 0.01:
+			break
+
 		if global_count > 50:
+			K1_fwd = 0.00021
 			K2_fwd = 0.00018
 			feed_forward_2 = -0.35
 			y_vel = 0.005
+			if y_flag == 1:
+				y_vel = 0
+				z_vel = 0.01
+				z_vel_offset = -0.0006
 
 		# collect 25 data points. When the num is reached, remove the oldest point and add the newest point
 		if filter_flag == 0:
@@ -217,32 +240,40 @@ while True:
 
 		arm1.move_by(x1_dot)
 		arm2.move_by(x2_dot)
-		#lift1.move_to(y1) # maintain the pose of the lift
-		#lift2.move_to(y2) # maintain the pose of the lift
-		lift1.move_by(y_vel)
-		lift2.move_by(y_vel)
-		base1.translate_by(0.0) # maintain the pose of the base
-		base2.translate_by(0.0) # maintain the pose of the base
-		base1.rotate_by(0.0)
-		base2.rotate_by(0.0)
+		lift1.move_by(y_vel) # maintain the pose of the lift
+		lift2.move_by(y_vel) # maintain the pose of the lift
+		base1.translate_by(z_vel)
+		base2.translate_by(-(z_vel+z_vel_offset))
 		robot1.push_command()
 		robot2.push_command()
 		print(time.time()-now)
-		y1_record.append(lift1_status.InValue['pos'])
-		y2_record.append(lift2_status.InValue['pos'])
-	
+		z1x_record.append(base1_status.InValue['x']) 
+		z2x_record.append(base2_status.InValue['x']) 
+		z1y_record.append(base1_status.InValue['y'])
+		z1y_record.append(base1_status.InValue['y'])
+
+
 	except:
 		traceback.print_exc()
 		break
 
 time.sleep(0.5)
-lift1.move_to(0.3)
-lift2.move_to(0.3)
+print ('Retracting...')
+
+# drop the tray
 arm1.move_to(0.0)
 arm2.move_to(0.0)
 robot1.push_command( )
 robot2.push_command( )
-print ('Retracting...')
+
+# retract
+time.sleep(2)
+base1.translate_by(-0.6)
+base2.translate_by(0.6)
+lift1.move_to(0.3)
+lift2.move_to(0.3)
+robot1.push_command()
+robot2.push_command()
 
 # data processing
 n_f = np.linspace(0,len(f1_record),len(f1_record))
@@ -279,9 +310,10 @@ ax4.legend()
 ax3.set_ylim([-0.005,0.005])
 ax4.set_ylim([-0.005,0.005])
 
-n_y = np.linspace(0,len(y1_record),len(y1_record))
-y1_record = np.array(y1_record)
-y2_record = np.array(y2_record)
+z1x_record = np.array(z1x_record)
+z2x_record = np.array(z2x_record)
+z1y_record = np.array(z1y_record)
+z2y_record = np.array(z2y_record)
 plt.show()
 
-np.savez('thesis_data_2.npy',f1=f1_record, f2=f2_record, x1_dot=x1_dot_record, x2_dot=x2_dot_record,y1=y1_record,y2=y2_record)
+np.savez('thesis_data_4.npy',f1=f1_record, f2=f2_record, x1_dot=x1_dot_record, x2_dot=x2_dot_record,z1_x=z1x_record,z2_x=z2x_record,z1_y=z1y_record, z2_y=z2y_record)

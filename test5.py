@@ -1,8 +1,8 @@
 '''
 force compliance: arm
-motion compliance: lift
+motion compliance: base
 desired force = 20N along arm direction
-desired velocity = 0.005m/s along lift direction
+desired velocity = 0.01m/s along base direction
 '''
 
 from RobotRaconteur.Client import *     #import RR client library
@@ -77,8 +77,8 @@ f2_d = 20
 v1_d = 0
 v2_d = 0
 
-K1_fwd = 0.00027
-K2_fwd = 0.00023
+K1_fwd = 0.00023
+K2_fwd = 0.00021
 K1_bwd = 0.00005
 K2_bwd = 0.0002
 
@@ -91,8 +91,8 @@ f1_record = []
 f2_record = []
 x1_dot_record = []
 x2_dot_record = []
-y1_record = []
-y2_record = []
+z1_record = []
+z2_record = []
 
 y1_0 = 0.383
 y2_0 = 0.4
@@ -127,16 +127,18 @@ x2_dot = 0.0
 f1_reading = 0
 f2_reading = 0
 global_count = 0
-y_vel = 0.0
+z_vel = 0.0
+z_vel_offset = 0.0
 while True:
 	try:
 		global_count += 1
 		now = time.time()
 
-		if global_count > 50:
+		if global_count > 60:
 			K2_fwd = 0.00018
 			feed_forward_2 = -0.35
-			y_vel = 0.005
+			z_vel = 0.01
+			z_vel_offset = -0.001
 
 		# collect 25 data points. When the num is reached, remove the oldest point and add the newest point
 		if filter_flag == 0:
@@ -217,19 +219,15 @@ while True:
 
 		arm1.move_by(x1_dot)
 		arm2.move_by(x2_dot)
-		#lift1.move_to(y1) # maintain the pose of the lift
-		#lift2.move_to(y2) # maintain the pose of the lift
-		lift1.move_by(y_vel)
-		lift2.move_by(y_vel)
-		base1.translate_by(0.0) # maintain the pose of the base
-		base2.translate_by(0.0) # maintain the pose of the base
-		base1.rotate_by(0.0)
-		base2.rotate_by(0.0)
+		lift1.move_to(0.383) # maintain the pose of the lift
+		lift2.move_to(0.4) # maintain the pose of the lift
+		base1.translate_by(z_vel)
+		base2.translate_by(-(z_vel+z_vel_offset))
 		robot1.push_command()
 		robot2.push_command()
 		print(time.time()-now)
-		y1_record.append(lift1_status.InValue['pos'])
-		y2_record.append(lift2_status.InValue['pos'])
+		z1_record.append(base1_status.InValue['x']) # "x" is the forward pose
+		z2_record.append(base2_status.InValue['x']) # "x" is the forward pose
 	
 	except:
 		traceback.print_exc()
@@ -240,6 +238,8 @@ lift1.move_to(0.3)
 lift2.move_to(0.3)
 arm1.move_to(0.0)
 arm2.move_to(0.0)
+base1.translate_by(-1*z_vel*(global_count-80))
+base2.translate_by((z_vel+z_vel_offset)*(global_count-80))
 robot1.push_command( )
 robot2.push_command( )
 print ('Retracting...')
@@ -279,9 +279,9 @@ ax4.legend()
 ax3.set_ylim([-0.005,0.005])
 ax4.set_ylim([-0.005,0.005])
 
-n_y = np.linspace(0,len(y1_record),len(y1_record))
-y1_record = np.array(y1_record)
-y2_record = np.array(y2_record)
+n_z = np.linspace(0,len(z1_record),len(z1_record))
+z1_record = np.array(z1_record)
+z2_record = np.array(z2_record)
 plt.show()
 
-np.savez('thesis_data_2.npy',f1=f1_record, f2=f2_record, x1_dot=x1_dot_record, x2_dot=x2_dot_record,y1=y1_record,y2=y2_record)
+np.savez('thesis_data_3.npy',f1=f1_record, f2=f2_record, x1_dot=x1_dot_record, x2_dot=x2_dot_record,z1=z1_record,z2=z2_record)

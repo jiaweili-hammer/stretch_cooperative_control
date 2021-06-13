@@ -1,5 +1,6 @@
 '''
-arm only
+force compliance: arm
+motion compliance: N/A
 desired force = 20N along arm direction
 desired velocity = 0m/s
 '''
