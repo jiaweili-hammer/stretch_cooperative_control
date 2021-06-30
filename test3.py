@@ -79,13 +79,16 @@ v2_d = 0
 #K1_fwd = 0.00037
 #K2_fwd = 0.00035
 
-K1_fwd = 0.00023
-K2_fwd = 0.0002
+K1_fwd = 0.00025
+K2_fwd = 0.000157
 K1_bwd = 0.00005
 K2_bwd = 0.0002
 
-feed_forward_1 = 1.05
-feed_forward_2 = -0.5
+#feed_forward_1 = 1.05
+#feed_forward_2 = -0.5
+feed_forward_1 = 0.3
+feed_forward_2 = 0
+
 
 time.sleep(2)
 filter_flag = 0
@@ -100,8 +103,13 @@ P = 0.0
 I_1 = 0.000021
 D_1 = 0.00001
 
-I_2 = 0.00001
-D_2 = 0.00001
+
+
+I_2 = 0.000036
+D_2 = 0.000036
+
+#I_2 = 0.00001
+#D_2 = 0.00001
 
 pid1 = PID.PID(P, I_1, D_1)
 pid2 = PID.PID(P, I_2, D_2)

@@ -250,7 +250,7 @@ while True:
 		z1x_record.append(base1_status.InValue['x']) 
 		z2x_record.append(base2_status.InValue['x']) 
 		z1y_record.append(base1_status.InValue['y'])
-		z1y_record.append(base1_status.InValue['y'])
+		z2y_record.append(base2_status.InValue['y'])
 
 
 	except:
